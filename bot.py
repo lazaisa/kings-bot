@@ -1,3 +1,4 @@
+import os
 import discord
 from discord.ext import commands
 import random
@@ -98,4 +99,4 @@ async def clear(ctx, amount: int):
     await ctx.send(embed=embed, delete_after=5)
 
 keep_alive()
-bot.run('MTQ3OTc2NzQzNDE2Nzg0OTExMQ.GgOkwI.y-nrj3l22d5vDkIpACCSUSauYK3gzxwe6Mp_AY')
+bot.run(os.getenv('DISCORD_TOKEN'))
