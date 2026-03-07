@@ -97,6 +97,10 @@ async def clear(ctx, amount: int):
     await ctx.channel.purge(limit=amount + 1)
     embed = discord.Embed(description=f"🧹 Obrisao sam **{amount}** poruka, brate. Čisto ko suza!", color=0x3498db)
     await ctx.send(embed=embed, delete_after=5)
-
+@bot.command()
+async def invite(ctx):
+    # Generisao sam ti link sa tvojim Client ID-jem (1479767434167849111)
+    link = "https://discord.com/oauth2/authorize?client_id=1479767434167849111&permissions=8&scope=bot"
+    await ctx.send(f"👑 **King Pozivnica** 👑\n\nKlikni na link ispod da dodaš Kinga na svoj server:\n{link}")
 keep_alive()
 bot.run(os.getenv('DISCORD_TOKEN'))
