@@ -98,4 +98,4 @@ async def clear(ctx, amount: int):
     await ctx.send(embed=embed, delete_after=5)
 
 keep_alive()
-bot.run('OVDE_ZALEPITE_VAS_TOKEN')
+bot.run('MTQ3OTc2NzQzNDE2Nzg0OTExMQ.GgOkwI.y-nrj3l22d5vDkIpACCSUSauYK3gzxwe6Mp_AY')
