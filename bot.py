@@ -17,20 +17,19 @@ bot = commands.Bot(command_prefix='&', intents=intents, help_command=None)
 FOOTER_TEXT = "By KnEz.exe | Kings Of Reselling"
 KING_COLOR = 0xffd700
 
-# --- TICKET SISTEM (Dugme i logika) ---
+# --- TICKET SISTEM ---
 class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="🎫 Open Ticket", style=discord.ButtonStyle.gold, custom_id="open_ticket")
+    # POPRAVLJENO: style je sada discord.ButtonStyle.success (zelena)
+    @discord.ui.button(label="🎫 Open Ticket", style=discord.ButtonStyle.success, custom_id="open_ticket")
     async def open_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild = interaction.guild
         user = interaction.user
-        
-        # Provera da li kanal već postoji (opciono)
         ticket_name = f"ticket-{user.name.lower()}"
         
-        # Dozvole za kanal
+        # Dozvole: samo user i admini vide kanal
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
             user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
@@ -50,9 +49,9 @@ class TicketView(discord.ui.View):
 
 @bot.event
 async def on_ready():
-    bot.add_view(TicketView()) # Da dugme radi i posle restarta
+    bot.add_view(TicketView()) # Da dugme ostane aktivno
     await bot.change_presence(activity=discord.Game(name="Kings Of Reselling 👑"))
-    print(f'👑 King {bot.user.name} je spreman!')
+    print(f'👑 King {bot.user.name} je spreman i online!')
 
 # --- POMOĆNA FUNKCIJA ZA INVITE ---
 async def get_invites_count(member):
@@ -71,7 +70,7 @@ async def on_member_join(member):
     role = discord.utils.get(member.guild.roles, name="[ 👤 ] MEMBER")
     if role:
         try: await member.add_roles(role)
-        except: print("Fali dozvola za rolu.")
+        except: pass
 
     channel = discord.utils.get(member.guild.text_channels, name="📍┃dobrodoslica")
     if channel:
@@ -84,7 +83,8 @@ async def on_member_join(member):
 @bot.command(hidden=True)
 @commands.has_permissions(administrator=True)
 async def ticket(ctx):
-    await ctx.message.delete()
+    try: await ctx.message.delete()
+    except: pass
     embed = discord.Embed(
         title="🎫 KINGS SUPPORT",
         description="Ukoliko vam je potrebna pomoć ili želite da kupite nešto, otvorite tiket klikom na dugme ispod!",
@@ -100,12 +100,51 @@ async def close(ctx):
         await asyncio.sleep(5)
         await ctx.channel.delete()
 
-# --- SVE OSTALE KOMANDE (Popravljene) ---
+# --- MODERACIJA ---
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, reason="zato"):
+    try:
+        await member.kick(reason=reason)
+        await ctx.send(f"🚀 **{member.name}** je lansiran sa servera! Razlog: {reason}")
+    except:
+        await ctx.send("❌ Ne mogu da izbacim ovog korisnika.")
+
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, member: discord.Member, *, reason="zato"):
+    try:
+        await member.ban(reason=reason)
+        await ctx.send(f"🔨 **{member.name}** je proteran! Razlog: {reason}")
+    except:
+        await ctx.send("❌ Ne mogu da banujem ovog korisnika.")
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def lock(ctx):
+    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
+    await ctx.send("🔒 Kanal zaključan za @everyone.")
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def unlock(ctx):
+    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
+    await ctx.send("🔓 Kanal otključan.")
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def clear(ctx, amount: int):
+    try:
+        await ctx.channel.purge(limit=amount + 1)
+        await ctx.send(f"🧹 Obrisano **{amount}** poruka.", delete_after=5)
+    except: pass
+
+# --- INVITE & SOCIAL ---
 @bot.command()
 async def invite(ctx, member: discord.Member = None):
     target = member if member else ctx.author
     count = await get_invites_count(target)
-    embed = discord.Embed(title="📈 INVITE STATISTIKA", description=f"Korisnik {target.mention} je doveo **{count}** ljudi.", color=KING_COLOR)
+    embed = discord.Embed(title="📈 STATISTIKA", description=f"Korisnik {target.mention} je doveo **{count}** ljudi.", color=KING_COLOR)
     embed.set_footer(text=FOOTER_TEXT)
     await ctx.send(embed=embed)
 
@@ -122,43 +161,14 @@ async def invitelab(ctx):
         embed = discord.Embed(title="🏆 TOP 10 INVITER-A", description=text if text else "Nema podataka.", color=KING_COLOR)
         embed.set_footer(text=FOOTER_TEXT)
         await ctx.send(embed=embed)
-    except: await ctx.send("Greška pri učitavanju invajtova.")
+    except: await ctx.send("Greška pri učitavanju.")
 
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def clear(ctx, amount: int):
-    try:
-        await ctx.channel.purge(limit=amount + 1)
-        await ctx.send(f"🧹 Obrisano **{amount}** poruka.", delete_after=5)
-    except: pass
-
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member, *, reason="Nije naveden"):
-    await member.kick(reason=reason)
-    await ctx.send(f"🚀 **{member.name}** je izbačen.")
-
-@bot.command()
-@commands.has_permissions(ban_members=True)
-async def ban(ctx, member: discord.Member, *, reason="Nije naveden"):
-    await member.ban(reason=reason)
-    await ctx.send(f"🔨 **{member.name}** je banovan.")
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def lock(ctx):
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send("🔒 Kanal zaključan.")
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def unlock(ctx):
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send("🔓 Kanal otključan.")
-
+# --- OSTALO ---
 @bot.command()
 async def giveaway(ctx, minuti: int, pobednika: int, *, nagrada: str):
-    msg = await ctx.send(f"🎊 **GIVEAWAY** 🎊\nNagrada: **{nagrada}**\nReagujte sa 🎉!")
+    embed = discord.Embed(title="🎊 KINGS GIVEAWAY 🎊", description=f"🎁 Nagrada: **{nagrada}**\n🏆 Pobednika: **{pobednika}**\n⏳ Trajanje: **{minuti} min**", color=KING_COLOR)
+    embed.set_footer(text=FOOTER_TEXT)
+    msg = await ctx.send(embed=embed)
     await msg.add_reaction("🎉")
     await asyncio.sleep(minuti * 60)
     msg = await ctx.channel.fetch_message(msg.id)
@@ -185,7 +195,7 @@ async def help(ctx):
     embed = discord.Embed(title="📜 KRALJEVSKE KOMANDE", color=KING_COLOR)
     embed.add_field(name="🛡️ Admin", value="`kick`, `ban`, `clear`, `lock`, `unlock`", inline=False)
     embed.add_field(name="📈 Social", value="`invite`, `invitelab`", inline=False)
-    embed.add_field(name="🎉 Ostalo", value="`giveaway`, `poll`, `ping`, `userinfo`", inline=False)
+    embed.add_field(name="🎉 Ostalo", value="`giveaway`, `ping`", inline=False)
     embed.set_footer(text=FOOTER_TEXT)
     await ctx.send(embed=embed)
 
