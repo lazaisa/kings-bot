@@ -129,16 +129,16 @@ async def close(ctx):
         await ctx.channel.delete()
 
 
-# --- ANTI-LINK FILTER SA TIMEOUT ---
-    if "discord.gg/" in message.content.lower() and author_name not in allowed_users:
+# --- ANTI-LINK SA AUTOMATSKIM TIMEOUT-OM (15 MIN) ---
+    if "discord.gg/" in msg_content and author_name not in allowed_users:
         try:
             await message.delete()
             
-            # Timeout korisnika na 15 minuta
-            duration = datetime.timedelta(minutes=15)
-            await message.author.timeout(duration, reason="Slanje Discord invite linkova")
+            # Timeout na 15 minuta
+            trajanje = datetime.timedelta(minutes=15)
+            await message.author.timeout(trajanje, reason="Slanje Discord linkova (reklamiranje)")
             
-            embed = discord.Embed(title="🚫 REKLAMIRANJE ZABRANJENO", color=0xff0000) # Crvena za uzbunu
+            embed = discord.Embed(title="🚫 REKLAMIRANJE ZABRANJENO", color=0xff0000)
             embed.description = (
                 f"━━━━━━━━━━━━━━━━━━\n"
                 f"👑 Na **Kings Of Reselling** je zabranjeno reklamiranje!\n"
@@ -147,10 +147,26 @@ async def close(ctx):
                 f"━━━━━━━━━━━━━━━━━━"
             )
             embed.set_footer(text=FOOTER_TEXT)
+            
             await message.channel.send(embed=embed)
-            return # Prekidamo dalje izvršavanje za ovu poruku
+            return # Odmah prekidamo da ne bi proveravao ostale filtere
         except Exception as e:
             print(f"Greska kod antilinka: {e}")
+
+    # --- FILTER ZA PRODAJU (TVOJ POSTOJEĆI KOD) ---
+    if ("prodaja" in msg_content or "prodajem" in msg_content) and author_name not in allowed_users:
+        try:
+            await message.delete()
+            prodaja_channel_id = 1479762526819586070 
+            embed = discord.Embed(
+                description=f"{message.author.mention} Pogrešan kanal!!! Koristi kanal namenjen za prodaju <#{prodaja_channel_id}>",
+                color=KING_COLOR
+            )
+            embed.set_footer(text=FOOTER_TEXT)
+            await message.channel.send(embed=embed)
+            return
+        except Exception as e:
+            print(f"Greska kod filtera prodaje: {e}")}")
 
 # --- BRISANJE PORUKE PRODAJEM ---
 # --- FILTER ZA PRODAJU (PROVERAVA SVA SLOVA) ---
@@ -192,7 +208,7 @@ async def on_message(message):
 #          KINGS ULTRA AUDIT LOG SISTEM (FINAL)
 # =========================================================
 
-LOG_CHANNEL_ID = 1479762526819586070 
+LOG_CHANNEL_ID = 1479757402336268429
 
 # 1. LOG: Izmena poruke
 @bot.event
@@ -520,9 +536,17 @@ async def say(ctx, *, poruka):
 @bot.command()
 async def help(ctx):
     embed = discord.Embed(title="📜 KRALJEVSKE KOMANDE", color=KING_COLOR)
+    embed.description = "━━━━━━━━━━━━━━━━━━"
+    
+    # 🛡️ ADMIN
     embed.add_field(name="🛡️ Admin", value="`kick`, `ban`, `unban`, `clear`, `lock`, `unlock`", inline=False)
-    embed.add_field(name="📈 Social", value="`invite`, `invitelab`", inline=False)
+    
+    # 📈 SOCIAL (Dodate info i serverinfo ovde)
+    embed.add_field(name="📈 Social", value="`invite`, `invitelab`, `info`, `serverinfo`", inline=False)
+    
+    # 🎉 OSTALO
     embed.add_field(name="🎉 Ostalo", value="`giveaway`, `ping`, `ticket`", inline=False)
+    
     embed.set_footer(text=FOOTER_TEXT)
     await ctx.send(embed=embed)
 
