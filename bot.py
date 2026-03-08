@@ -4,6 +4,7 @@ from discord.ext import commands
 import random
 import asyncio
 from KeepAlive import keep_alive
+import datetime
 
 # Podešavanje dozvola
 intents = discord.Intents.default()
@@ -127,6 +128,30 @@ async def close(ctx):
         await asyncio.sleep(3)
         await ctx.channel.delete()
 
+
+# --- ANTI-LINK FILTER SA TIMEOUT ---
+    if "discord.gg/" in message.content.lower() and author_name not in allowed_users:
+        try:
+            await message.delete()
+            
+            # Timeout korisnika na 15 minuta
+            duration = datetime.timedelta(minutes=15)
+            await message.author.timeout(duration, reason="Slanje Discord invite linkova")
+            
+            embed = discord.Embed(title="🚫 REKLAMIRANJE ZABRANJENO", color=0xff0000) # Crvena za uzbunu
+            embed.description = (
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"👑 Na **Kings Of Reselling** je zabranjeno reklamiranje!\n"
+                f"👤 **Clan:** {message.author.mention}\n"
+                f"⚠️ **Kazna:** Poruka obrisana + **TIMEOUT 15 MIN**.\n"
+                f"━━━━━━━━━━━━━━━━━━"
+            )
+            embed.set_footer(text=FOOTER_TEXT)
+            await message.channel.send(embed=embed)
+            return # Prekidamo dalje izvršavanje za ovu poruku
+        except Exception as e:
+            print(f"Greska kod antilinka: {e}")
+
 # --- BRISANJE PORUKE PRODAJEM ---
 # --- FILTER ZA PRODAJU (PROVERAVA SVA SLOVA) ---
 @bot.event
@@ -162,6 +187,154 @@ async def on_message(message):
 
     # OVO JE OBAVEZNO da bi ostale komande radile
     await bot.process_commands(message)
+
+# =========================================================
+#          KINGS ULTRA AUDIT LOG SISTEM (FINAL)
+# =========================================================
+
+LOG_CHANNEL_ID = 1479762526819586070 
+
+# 1. LOG: Izmena poruke
+@bot.event
+async def on_message_edit(before, after):
+    if before.author.bot or before.content == after.content: return
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_ch: return
+    embed = discord.Embed(title="📝 LOG: IZMENA PORUKE", color=discord.Color.blue())
+    embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Autor:** {before.author.mention}\n📍 **Kanal:** {before.channel.mention}\n❌ **Stara:** \"{before.content}\"\n✅ **Nova:** \"{after.content}\"\n━━━━━━━━━━━━━━━━━━"
+    await log_ch.send(embed=embed)
+
+# 2. LOG: Brisanje poruke
+@bot.event
+async def on_message_delete(message):
+    if message.author.bot: return
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_ch: return
+    embed = discord.Embed(title="🗑️ LOG: PORUKA OBRISANA", color=discord.Color.red())
+    embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Autor:** {message.author.mention}\n📍 **Kanal:** {message.channel.mention}\n💬 **Sadržaj:** \"{message.content}\"\n━━━━━━━━━━━━━━━━━━"
+    await log_ch.send(embed=embed)
+
+# 3. LOG: Role Update & Timeout
+@bot.event
+async def on_member_update(before, after):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_ch: return
+    if before.roles != after.roles:
+        added = [role.mention for role in after.roles if role not in before.roles]
+        removed = [role.mention for role in before.roles if role not in after.roles]
+        async for entry in after.guild.audit_logs(action=discord.AuditLogAction.member_role_update, limit=1):
+            executor = entry.user
+            break
+        else: executor = "Nepoznato"
+        embed = discord.Embed(title="🛡️ ADMIN AKCIJA: ROLE UPDATE", color=discord.Color.orange())
+        desc = f"━━━━━━━━━━━━━━━━━━\n👤 **Meta:** {after.mention}\n🛠️ **Izvršio:** {executor}\n"
+        if added: desc += f"➕ **Dodata rola:** {', '.join(added)}\n"
+        if removed: desc += f"➖ **Skinuta rola:** {', '.join(removed)}\n"
+        desc += "━━━━━━━━━━━━━━━━━━"
+        embed.description = desc
+        await log_ch.send(embed=embed)
+    if before.timed_out_until != after.timed_out_until:
+        if after.timed_out_until:
+            async for entry in after.guild.audit_logs(action=discord.AuditLogAction.member_update, limit=1):
+                executor = entry.user
+                break
+            else: executor = "Nepoznato"
+            embed = discord.Embed(title="⏳ KAZNA: TIMEOUT", color=discord.Color.gold())
+            embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Kome:** {after.mention}\n🛠️ **Izvršio:** {executor}\n🕒 **Traje do:** {after.timed_out_until.strftime('%d.%m.%Y %H:%M')}\n━━━━━━━━━━━━━━━━━━"
+            await log_ch.send(embed=embed)
+
+# 4. LOG: Kick, Ban, Unban
+@bot.event
+async def on_member_remove(member):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_ch: return
+    async for entry in member.guild.audit_logs(limit=1):
+        if entry.action == discord.AuditLogAction.kick and entry.target.id == member.id:
+            embed = discord.Embed(title="🚀 SISTEM: KICK", color=discord.Color.red())
+            embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Izbačen:** {member.name}\n🛠️ **Izvršio:** {entry.user}\n📝 **Razlog:** {entry.reason if entry.reason else '///'}\n━━━━━━━━━━━━━━━━━━"
+            await log_ch.send(embed=embed)
+            break
+
+@bot.event
+async def on_member_ban(guild, user):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_ch: return
+    async for entry in guild.audit_logs(action=discord.AuditLogAction.ban, limit=1):
+        embed = discord.Embed(title="🔨 SISTEM: BAN", color=discord.Color.dark_red())
+        embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Banovan:** {user.name}\n🛠️ **Izvršio:** {entry.user}\n📝 **Razlog:** {entry.reason if entry.reason else '///'}\n━━━━━━━━━━━━━━━━━━"
+        await log_ch.send(embed=embed)
+
+@bot.event
+async def on_member_unban(guild, user):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    if not log_ch: return
+    async for entry in guild.audit_logs(action=discord.AuditLogAction.unban, limit=1):
+        embed = discord.Embed(title="🔓 SISTEM: UNBAN", color=discord.Color.green())
+        embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Pomilovan:** {user.name}\n🛠️ **Izvršio:** {entry.user}\n━━━━━━━━━━━━━━━━━━"
+        await log_ch.send(embed=embed)
+
+# 5. LOG: Kanali & Kategorije
+@bot.event
+async def on_guild_channel_create(channel):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    async for entry in channel.guild.audit_logs(action=discord.AuditLogAction.channel_create, limit=1):
+        embed = discord.Embed(title="⚙️ SISTEM: KANAL NAPRAVLJEN", color=discord.Color.green())
+        embed.description = f"━━━━━━━━━━━━━━━━━━\n📂 **Kanal:** {channel.mention}\n🛠️ **Izvršio:** {entry.user}\n📁 **Kategorija:** {channel.category.name if channel.category else 'Nema'}\n━━━━━━━━━━━━━━━━━━"
+        await log_ch.send(embed=embed)
+
+@bot.event
+async def on_guild_channel_delete(channel):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    async for entry in channel.guild.audit_logs(action=discord.AuditLogAction.channel_delete, limit=1):
+        embed = discord.Embed(title="⚙️ SISTEM: KANAL OBRISAN", color=discord.Color.dark_gray())
+        embed.description = f"━━━━━━━━━━━━━━━━━━\n🗑️ **Kanal:** `#{channel.name}`\n🛠️ **Izvršio:** {entry.user}\n━━━━━━━━━━━━━━━━━━"
+        await log_ch.send(embed=embed)
+
+# 6. LOG: IZMENA PERMISIJA (Stavka 10 - Kanali & Role)
+@bot.event
+async def on_guild_role_update(before, after):
+    if before.permissions != after.permissions:
+        log_ch = bot.get_channel(LOG_CHANNEL_ID)
+        async for entry in after.guild.audit_logs(action=discord.AuditLogAction.role_update, limit=1):
+            executor = entry.user
+            break
+        else: executor = "Nepoznato"
+        embed = discord.Embed(title="🔑 SISTEM: IZMENA PERMISIJA ROLE", color=discord.Color.blurple())
+        embed.description = f"━━━━━━━━━━━━━━━━━━\n🛡️ **Rola:** {after.name}\n🛠️ **Izvršio:** {executor}\n⚠️ **Akcija:** Promenjene globalne dozvole role.\n━━━━━━━━━━━━━━━━━━"
+        await log_ch.send(embed=embed)
+
+@bot.event
+async def on_guild_channel_update(before, after):
+    # Provera za permisije kanala (Stavka 10)
+    if before.overwrites != after.overwrites:
+        log_ch = bot.get_channel(LOG_CHANNEL_ID)
+        async for entry in after.guild.audit_logs(action=discord.AuditLogAction.channel_overwrite_update, limit=1):
+            executor = entry.user
+            break
+        else: executor = "Nepoznato"
+        embed = discord.Embed(title="🔒 SISTEM: KANAL PERMISIJE", color=discord.Color.dark_magenta())
+        embed.description = f"━━━━━━━━━━━━━━━━━━\n📍 **Kanal:** {after.mention}\n🛠️ **Izvršio:** {executor}\n📝 **Info:** Izmenjene dozvole za uloge/članove u kanalu.\n━━━━━━━━━━━━━━━━━━"
+        await log_ch.send(embed=embed)
+
+# 7. LOG: Invite & Role Create/Delete
+@bot.event
+async def on_invite_create(invite):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    embed = discord.Embed(title="🔗 SISTEM: INVITE NAPRAVLJEN", color=discord.Color.purple())
+    embed.description = f"━━━━━━━━━━━━━━━━━━\n🛠️ **Napravio:** {invite.inviter}\n🆔 **Kod:** `{invite.code}`\n📍 **Kanal:** {invite.channel.mention}\n━━━━━━━━━━━━━━━━━━"
+    await log_ch.send(embed=embed)
+
+@bot.event
+async def on_guild_role_create(role):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    async for entry in role.guild.audit_logs(action=discord.AuditLogAction.role_create, limit=1):
+        await log_ch.send(f"🛡️ **SISTEM:** Rola **{role.name}** napravljena (Izvršio: {entry.user})")
+
+@bot.event
+async def on_guild_role_delete(role):
+    log_ch = bot.get_channel(LOG_CHANNEL_ID)
+    async for entry in role.guild.audit_logs(action=discord.AuditLogAction.role_delete, limit=1):
+        await log_ch.send(f"🛡️ **SISTEM:** Rola **{role.name}** obrisana (Izvršio: {entry.user})")
 
 # --- MODERACIJA ---
 @bot.command()
@@ -276,6 +449,44 @@ async def invitelab(ctx):
         
     except Exception as e:
         await ctx.send(f"Greška: {e}")
+
+# --- INFO & SERVERINFO ---
+@bot.command()
+async def info(ctx, member: discord.Member = None):
+    target = member if member else ctx.author
+    
+    # Dobijanje najveće uloge (ignorišemo @everyone)
+    top_role = target.top_role.mention if len(target.roles) > 1 else "Nema rol"
+    
+    embed = discord.Embed(title="👑 KINGS CLAN | PROFIL", color=KING_COLOR)
+    embed.description = (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👤 **Clan:** {target.mention}\n"
+        f"🆔 **ID:** `{target.id}`\n"
+        f"📅 **Na serveru od:** {target.joined_at.strftime('%d.%m.%Y.')}\n"
+        f"🛡️ **Najveci Rol:** {top_role}\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
+    embed.set_footer(text=FOOTER_TEXT)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def serverinfo(ctx):
+    guild = ctx.guild
+    # Brojanje članova (bez botova)
+    member_count = len([m for m in guild.members if not m.bot])
+    
+    embed = discord.Embed(title="🌍 INFORMACIJE O SERVERU", color=KING_COLOR)
+    embed.description = (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"👑 **Owner:** {guild.owner.mention}\n"
+        f"👥 **Ukupno clanova:** {member_count}\n"
+        f"✨ **Nivo servera:** Level {guild.premium_tier}\n"
+        f"📅 **Datum kreiranja:** {guild.created_at.strftime('%d.%m.%Y.')}\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
+    embed.set_footer(text=FOOTER_TEXT)
+    await ctx.send(embed=embed)
 
 
 # --- OSTALO ---
