@@ -68,9 +68,7 @@ async def get_invites_count(member):
     except:
         return 0
 
-
 # -- NAZAD/NAPRED --
-
 class InvitePaginator(discord.ui.View):
     def __init__(self, pages, timeout=60):
         super().__init__(timeout=timeout)
@@ -107,34 +105,20 @@ async def on_member_join(member):
         embed.set_footer(text=FOOTER_TEXT)
         await channel.send(embed=embed)
 
-# --- KOMANDE ZA TICKET ---
-@bot.command(hidden=True)
-@commands.has_permissions(administrator=True)
-async def ticket(ctx):
-    try: await ctx.message.delete()
-    except: pass
-    embed = discord.Embed(
-        title="🎫 KINGS SUPPORT",
-        description="Ukoliko vam je potrebna pomoć ili želite da kupite nešto, otvorite tiket klikom na dugme ispod!",
-        color=KING_COLOR
-    )
-    embed.set_footer(text=FOOTER_TEXT)
-    await ctx.send(embed=embed, view=TicketView())
+# --- GLAVNI EVENT ZA PORUKE (FILTERI) ---
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
 
-@bot.command()
-async def close(ctx):
-    if "ticket-" in ctx.channel.name:
-        await ctx.send("Tiket će biti obrisan za 3 sekunde...")
-        await asyncio.sleep(3)
-        await ctx.channel.delete()
+    allowed_users = ["knez.exe", "nemanjaa79"]
+    author_name = message.author.name.lower()
+    msg_content = message.content.lower()
 
-
-# --- ANTI-LINK SA AUTOMATSKIM TIMEOUT-OM (15 MIN) ---
+    # --- ANTI-LINK SA AUTOMATSKIM TIMEOUT-OM ---
     if "discord.gg/" in msg_content and author_name not in allowed_users:
         try:
             await message.delete()
-            
-            # Timeout na 15 minuta
             trajanje = datetime.timedelta(minutes=15)
             await message.author.timeout(trajanje, reason="Slanje Discord linkova (reklamiranje)")
             
@@ -147,13 +131,12 @@ async def close(ctx):
                 f"━━━━━━━━━━━━━━━━━━"
             )
             embed.set_footer(text=FOOTER_TEXT)
-            
             await message.channel.send(embed=embed)
-            return # Odmah prekidamo da ne bi proveravao ostale filtere
+            return 
         except Exception as e:
             print(f"Greska kod antilinka: {e}")
 
-    # --- FILTER ZA PRODAJU (TVOJ POSTOJEĆI KOD) ---
+    # --- FILTER ZA PRODAJU ---
     if ("prodaja" in msg_content or "prodajem" in msg_content) and author_name not in allowed_users:
         try:
             await message.delete()
@@ -166,51 +149,15 @@ async def close(ctx):
             await message.channel.send(embed=embed)
             return
         except Exception as e:
-            print(f"Greska kod filtera prodaje: {e}")}")
+            print(f"Greska kod filtera prodaje: {e}")
 
-# --- BRISANJE PORUKE PRODAJEM ---
-# --- FILTER ZA PRODAJU (PROVERAVA SVA SLOVA) ---
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-
-    # Dozvoljeni korisnici koji mogu da pisu ove reci
-    allowed_users = ["knez.exe", "nemanjaa79"]
-    author_name = message.author.name.lower()
-    
-    # Ovde pretvaramo celu poruku u mala slova za proveru
-    # To znaci da ce hvatati i "PRODAJA" i "pRoDaJeM" i "Prodajem"
-    msg_content = message.content.lower()
-
-    if ("prodaja" in msg_content or "prodajem" in msg_content) and author_name not in allowed_users:
-        try:
-            await message.delete()
-            
-            # ID tvog kanala #🏷️┃prodajem
-            prodaja_channel_id = 1479762526819586070 
-            
-            embed = discord.Embed(
-                description=f"{message.author.mention} Pogresan kanal!!! Koristi kanal koji je namenjen za prodaju <#{prodaja_channel_id}>",
-                color=KING_COLOR
-            )
-            embed.set_footer(text=FOOTER_TEXT)
-            
-            # Poruka ostaje u kanalu da svi vide pravilo
-            await message.channel.send(embed=embed)
-        except Exception as e:
-            print(f"Greska kod filtera: {e}")
-
-    # OVO JE OBAVEZNO da bi ostale komande radile
     await bot.process_commands(message)
 
 # =========================================================
-#          KINGS ULTRA AUDIT LOG SISTEM (FINAL)
+#           KINGS ULTRA AUDIT LOG SISTEM
 # =========================================================
-
 LOG_CHANNEL_ID = 1479757402336268429
 
-# 1. LOG: Izmena poruke
 @bot.event
 async def on_message_edit(before, after):
     if before.author.bot or before.content == after.content: return
@@ -220,7 +167,6 @@ async def on_message_edit(before, after):
     embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Autor:** {before.author.mention}\n📍 **Kanal:** {before.channel.mention}\n❌ **Stara:** \"{before.content}\"\n✅ **Nova:** \"{after.content}\"\n━━━━━━━━━━━━━━━━━━"
     await log_ch.send(embed=embed)
 
-# 2. LOG: Brisanje poruke
 @bot.event
 async def on_message_delete(message):
     if message.author.bot: return
@@ -230,7 +176,6 @@ async def on_message_delete(message):
     embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Autor:** {message.author.mention}\n📍 **Kanal:** {message.channel.mention}\n💬 **Sadržaj:** \"{message.content}\"\n━━━━━━━━━━━━━━━━━━"
     await log_ch.send(embed=embed)
 
-# 3. LOG: Role Update & Timeout
 @bot.event
 async def on_member_update(before, after):
     log_ch = bot.get_channel(LOG_CHANNEL_ID)
@@ -259,7 +204,6 @@ async def on_member_update(before, after):
             embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Kome:** {after.mention}\n🛠️ **Izvršio:** {executor}\n🕒 **Traje do:** {after.timed_out_until.strftime('%d.%m.%Y %H:%M')}\n━━━━━━━━━━━━━━━━━━"
             await log_ch.send(embed=embed)
 
-# 4. LOG: Kick, Ban, Unban
 @bot.event
 async def on_member_remove(member):
     log_ch = bot.get_channel(LOG_CHANNEL_ID)
@@ -289,7 +233,6 @@ async def on_member_unban(guild, user):
         embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Pomilovan:** {user.name}\n🛠️ **Izvršio:** {entry.user}\n━━━━━━━━━━━━━━━━━━"
         await log_ch.send(embed=embed)
 
-# 5. LOG: Kanali & Kategorije
 @bot.event
 async def on_guild_channel_create(channel):
     log_ch = bot.get_channel(LOG_CHANNEL_ID)
@@ -306,7 +249,6 @@ async def on_guild_channel_delete(channel):
         embed.description = f"━━━━━━━━━━━━━━━━━━\n🗑️ **Kanal:** `#{channel.name}`\n🛠️ **Izvršio:** {entry.user}\n━━━━━━━━━━━━━━━━━━"
         await log_ch.send(embed=embed)
 
-# 6. LOG: IZMENA PERMISIJA (Stavka 10 - Kanali & Role)
 @bot.event
 async def on_guild_role_update(before, after):
     if before.permissions != after.permissions:
@@ -321,7 +263,6 @@ async def on_guild_role_update(before, after):
 
 @bot.event
 async def on_guild_channel_update(before, after):
-    # Provera za permisije kanala (Stavka 10)
     if before.overwrites != after.overwrites:
         log_ch = bot.get_channel(LOG_CHANNEL_ID)
         async for entry in after.guild.audit_logs(action=discord.AuditLogAction.channel_overwrite_update, limit=1):
@@ -332,7 +273,6 @@ async def on_guild_channel_update(before, after):
         embed.description = f"━━━━━━━━━━━━━━━━━━\n📍 **Kanal:** {after.mention}\n🛠️ **Izvršio:** {executor}\n📝 **Info:** Izmenjene dozvole za uloge/članove u kanalu.\n━━━━━━━━━━━━━━━━━━"
         await log_ch.send(embed=embed)
 
-# 7. LOG: Invite & Role Create/Delete
 @bot.event
 async def on_invite_create(invite):
     log_ch = bot.get_channel(LOG_CHANNEL_ID)
@@ -398,33 +338,41 @@ async def clear(ctx, amount: int):
         await ctx.send(f"🧹 Obrisano **{amount}** poruka.", delete_after=5)
     except: pass
 
-# --- INVITE & SOCIAL (OPCIJA 3) ---
+# --- KOMANDE ZA TICKET ---
+@bot.command(hidden=True)
+@commands.has_permissions(administrator=True)
+async def ticket(ctx):
+    try: await ctx.message.delete()
+    except: pass
+    embed = discord.Embed(
+        title="🎫 KINGS SUPPORT",
+        description="Ukoliko vam je potrebna pomoć ili želite da kupite nešto, otvorite tiket klikom na dugme ispod!",
+        color=KING_COLOR
+    )
+    embed.set_footer(text=FOOTER_TEXT)
+    await ctx.send(embed=embed, view=TicketView())
+
+@bot.command()
+async def close(ctx):
+    if "ticket-" in ctx.channel.name:
+        await ctx.send("Tiket će biti obrisan za 3 sekunde...")
+        await asyncio.sleep(3)
+        await ctx.channel.delete()
+
+# --- INVITE & SOCIAL ---
 @bot.command()
 async def invite(ctx, member: discord.Member = None):
     target = member if member else ctx.author
-    
     try:
         invs = await ctx.guild.invites()
         joined = 0
-        # Računamo koliko je ljudi ušlo preko svih njegovih aktivnih linkova
         for i in invs:
             if i.inviter and i.inviter.id == target.id:
                 joined += i.uses
-        
-        # Simulacija za Left i Total (bez baze podataka ovo su najbolje procene)
-        # Napomena: Za 100% tačan 'Left' bot bi morao da prati ulaze/izlaze u realnom vremenu
         left = 0 
         total = joined - left
-
         embed = discord.Embed(title="📈 STATISTIKA", color=KING_COLOR)
-        embed.description = (
-            f"👤 **Član:** {target.mention}\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"📥 **Joined:** {joined}\n"
-            f"📤 **Left:** {left}\n"
-            f"🏆 **Total:** {total}\n"
-            f"━━━━━━━━━━━━━━━━━━"
-        )
+        embed.description = f"👤 **Član:** {target.mention}\n━━━━━━━━━━━━━━━━━━\n📥 **Joined:** {joined}\n📤 **Left:** {left}\n🏆 **Total:** {total}\n━━━━━━━━━━━━━━━━━━"
         embed.set_footer(text=FOOTER_TEXT)
         await ctx.send(embed=embed)
     except Exception as e:
@@ -438,72 +386,42 @@ async def invitelab(ctx):
         for i in invs:
             if i.inviter:
                 all_invites[i.inviter] = all_invites.get(i.inviter, 0) + i.uses
-        
         sorted_inv = sorted(all_invites.items(), key=lambda x: x[1], reverse=True)[:20]
-        
-        if not sorted_inv:
-            return await ctx.send("Nema podataka o invite-ovima.")
-
+        if not sorted_inv: return await ctx.send("Nema podataka o invite-ovima.")
         pages = []
         for i in range(0, len(sorted_inv), 10):
             chunk = sorted_inv[i:i + 10]
             embed = discord.Embed(title="🏆 TOP 20 INVITER-A", color=KING_COLOR)
-            
             description = "━━━━━━━━━━━━━━━━━━\n"
             for index, (user, joined) in enumerate(chunk):
                 left = 0 
                 total = joined - left
                 description += f"**{i + index + 1}. {user.name}**\n📥 Joined: `{joined}` | 📤 Left: `{left}` | 🏆 Total: `{total}`\n\n"
-            
             description += "━━━━━━━━━━━━━━━━━━"
             embed.description = description
             embed.set_footer(text=f"Stranica {len(pages) + 1} | {FOOTER_TEXT}")
             pages.append(embed)
-
         view = InvitePaginator(pages)
         await ctx.send(embed=pages[0], view=view)
-        
-    except Exception as e:
-        await ctx.send(f"Greška: {e}")
+    except Exception as e: await ctx.send(f"Greška: {e}")
 
-# --- INFO & SERVERINFO ---
 @bot.command()
 async def info(ctx, member: discord.Member = None):
     target = member if member else ctx.author
-    
-    # Dobijanje najveće uloge (ignorišemo @everyone)
     top_role = target.top_role.mention if len(target.roles) > 1 else "Nema rol"
-    
     embed = discord.Embed(title="👑 KINGS CLAN | PROFIL", color=KING_COLOR)
-    embed.description = (
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"👤 **Clan:** {target.mention}\n"
-        f"🆔 **ID:** `{target.id}`\n"
-        f"📅 **Na serveru od:** {target.joined_at.strftime('%d.%m.%Y.')}\n"
-        f"🛡️ **Najveci Rol:** {top_role}\n"
-        f"━━━━━━━━━━━━━━━━━━"
-    )
+    embed.description = f"━━━━━━━━━━━━━━━━━━\n👤 **Clan:** {target.mention}\n🆔 **ID:** `{target.id}`\n📅 **Na serveru od:** {target.joined_at.strftime('%d.%m.%Y.')}\n🛡️ **Najveci Rol:** {top_role}\n━━━━━━━━━━━━━━━━━━"
     embed.set_footer(text=FOOTER_TEXT)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def serverinfo(ctx):
     guild = ctx.guild
-    # Brojanje članova (bez botova)
     member_count = len([m for m in guild.members if not m.bot])
-    
     embed = discord.Embed(title="🌍 INFORMACIJE O SERVERU", color=KING_COLOR)
-    embed.description = (
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"👑 **Owner:** {guild.owner.mention}\n"
-        f"👥 **Ukupno clanova:** {member_count}\n"
-        f"✨ **Nivo servera:** Level {guild.premium_tier}\n"
-        f"📅 **Datum kreiranja:** {guild.created_at.strftime('%d.%m.%Y.')}\n"
-        f"━━━━━━━━━━━━━━━━━━"
-    )
+    embed.description = f"━━━━━━━━━━━━━━━━━━\n👑 **Owner:** {guild.owner.mention}\n👥 **Ukupno clanova:** {member_count}\n✨ **Nivo servera:** Level {guild.premium_tier}\n📅 **Datum kreiranja:** {guild.created_at.strftime('%d.%m.%Y.')}\n━━━━━━━━━━━━━━━━━━"
     embed.set_footer(text=FOOTER_TEXT)
     await ctx.send(embed=embed)
-
 
 # --- OSTALO ---
 @bot.command()
@@ -537,16 +455,9 @@ async def say(ctx, *, poruka):
 async def help(ctx):
     embed = discord.Embed(title="📜 KRALJEVSKE KOMANDE", color=KING_COLOR)
     embed.description = "━━━━━━━━━━━━━━━━━━"
-    
-    # 🛡️ ADMIN
     embed.add_field(name="🛡️ Admin", value="`kick`, `ban`, `unban`, `clear`, `lock`, `unlock`", inline=False)
-    
-    # 📈 SOCIAL (Dodate info i serverinfo ovde)
     embed.add_field(name="📈 Social", value="`invite`, `invitelab`, `info`, `serverinfo`", inline=False)
-    
-    # 🎉 OSTALO
     embed.add_field(name="🎉 Ostalo", value="`giveaway`, `ping`, `ticket`", inline=False)
-    
     embed.set_footer(text=FOOTER_TEXT)
     await ctx.send(embed=embed)
 
