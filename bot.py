@@ -136,22 +136,34 @@ async def on_message(message):
         except Exception as e:
             print(f"Greska kod antilinka: {e}")
 
-    # --- FILTER ZA PRODAJU ---
+     # --- FILTER ZA PRODAJU (SA POPRAVKOM ZA FORUME) ---
     if ("prodaja" in msg_content or "prodajem" in msg_content) and author_name not in allowed_users:
-        try:
-            await message.delete()
-            prodaja_channel_id = 1479762526819586070 
-            embed = discord.Embed(
-                description=f"{message.author.mention} Pogrešan kanal!!! Koristi kanal namenjen za prodaju <#{prodaja_channel_id}>",
-                color=KING_COLOR
-            )
-            embed.set_footer(text=FOOTER_TEXT)
-            await message.channel.send(embed=embed)
-            return
-        except Exception as e:
-            print(f"Greska kod filtera prodaje: {e}")
+        prodaja_forum_id = 1479762526819586070 
+        
+        # Proveravamo da li je poruka u forumu ili u postu unutar foruma
+        is_in_forum = False
+        if message.channel.id == prodaja_forum_id:
+            is_in_forum = True
+        elif hasattr(message.channel, 'parent_id') and message.channel.parent_id == prodaja_forum_id:
+            is_in_forum = True
 
+        # Ako NIJE u forumu, tek onda briši
+        if not is_in_forum:
+            try:
+                await message.delete()
+                embed = discord.Embed(
+                    description=f"{message.author.mention} Pogrešan kanal!!! Koristi kanal namenjen za prodaju <#{prodaja_forum_id}>",
+                    color=KING_COLOR
+                )
+                embed.set_footer(text=FOOTER_TEXT)
+                await message.channel.send(embed=embed)
+                return
+            except Exception as e:
+                print(f"Greska kod filtera prodaje: {e}")
+
+    # OVO OBAVEZNO OSTAVI NA KRAJU on_message
     await bot.process_commands(message)
+
 
 # =========================================================
 #           KINGS ULTRA AUDIT LOG SISTEM
