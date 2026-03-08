@@ -67,6 +67,30 @@ async def get_invites_count(member):
     except:
         return 0
 
+
+# -- NAZAD/NAPRED --
+
+class InvitePaginator(discord.ui.View):
+    def __init__(self, pages, timeout=60):
+        super().__init__(timeout=timeout)
+        self.pages = pages
+        self.current_page = 0
+
+    async def update_view(self, interaction: discord.Interaction):
+        await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
+
+    @discord.ui.button(label="⬅️ Back", style=discord.ButtonStyle.gray)
+    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page > 0:
+            self.current_page -= 1
+            await self.update_view(interaction)
+
+    @discord.ui.button(label="Next ➡️", style=discord.ButtonStyle.gray)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page < len(self.pages) - 1:
+            self.current_page += 1
+            await self.update_view(interaction)
+
 # --- AUTOMATSKA ROLA I DOBRODOŠLICA ---
 @bot.event
 async def on_member_join(member):
@@ -185,14 +209,37 @@ async def clear(ctx, amount: int):
         await ctx.send(f"🧹 Obrisano **{amount}** poruka.", delete_after=5)
     except: pass
 
-# --- INVITE & SOCIAL ---
+# --- INVITE & SOCIAL (OPCIJA 3) ---
 @bot.command()
 async def invite(ctx, member: discord.Member = None):
     target = member if member else ctx.author
-    count = await get_invites_count(target)
-    embed = discord.Embed(title="📈 STATISTIKA", description=f"Korisnik {target.mention} je doveo **{count}** ljudi.", color=KING_COLOR)
-    embed.set_footer(text=FOOTER_TEXT)
-    await ctx.send(embed=embed)
+    
+    try:
+        invs = await ctx.guild.invites()
+        joined = 0
+        # Računamo koliko je ljudi ušlo preko svih njegovih aktivnih linkova
+        for i in invs:
+            if i.inviter and i.inviter.id == target.id:
+                joined += i.uses
+        
+        # Simulacija za Left i Total (bez baze podataka ovo su najbolje procene)
+        # Napomena: Za 100% tačan 'Left' bot bi morao da prati ulaze/izlaze u realnom vremenu
+        left = 0 
+        total = joined - left
+
+        embed = discord.Embed(title="📈 STATISTIKA", color=KING_COLOR)
+        embed.description = (
+            f"👤 **Član:** {target.mention}\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"📥 **Joined:** {joined}\n"
+            f"📤 **Left:** {left}\n"
+            f"🏆 **Total:** {total}\n"
+            f"━━━━━━━━━━━━━━━━━━"
+        )
+        embed.set_footer(text=FOOTER_TEXT)
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Greška pri čitanju invite-ova: {e}")
 
 @bot.command()
 async def invitelab(ctx):
@@ -202,12 +249,34 @@ async def invitelab(ctx):
         for i in invs:
             if i.inviter:
                 all_invites[i.inviter] = all_invites.get(i.inviter, 0) + i.uses
-        sorted_inv = sorted(all_invites.items(), key=lambda x: x[1], reverse=True)[:10]
-        text = "\n".join([f"{i+1}. {u.mention} - **{c}**" for i, (u, c) in enumerate(sorted_inv)])
-        embed = discord.Embed(title="🏆 TOP 10 INVITER-A", description=text if text else "Nema podataka.", color=KING_COLOR)
-        embed.set_footer(text=FOOTER_TEXT)
-        await ctx.send(embed=embed)
-    except: await ctx.send("Greška pri učitavanju.")
+        
+        sorted_inv = sorted(all_invites.items(), key=lambda x: x[1], reverse=True)[:20]
+        
+        if not sorted_inv:
+            return await ctx.send("Nema podataka o invite-ovima.")
+
+        pages = []
+        for i in range(0, len(sorted_inv), 10):
+            chunk = sorted_inv[i:i + 10]
+            embed = discord.Embed(title="🏆 TOP 20 INVITER-A", color=KING_COLOR)
+            
+            description = "━━━━━━━━━━━━━━━━━━\n"
+            for index, (user, joined) in enumerate(chunk):
+                left = 0 
+                total = joined - left
+                description += f"**{i + index + 1}. {user.name}**\n📥 Joined: `{joined}` | 📤 Left: `{left}` | 🏆 Total: `{total}`\n\n"
+            
+            description += "━━━━━━━━━━━━━━━━━━"
+            embed.description = description
+            embed.set_footer(text=f"Stranica {len(pages) + 1} | {FOOTER_TEXT}")
+            pages.append(embed)
+
+        view = InvitePaginator(pages)
+        await ctx.send(embed=pages[0], view=view)
+        
+    except Exception as e:
+        await ctx.send(f"Greška: {e}")
+
 
 # --- OSTALO ---
 @bot.command()
