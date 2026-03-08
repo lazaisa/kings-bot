@@ -103,6 +103,45 @@ async def close(ctx):
         await asyncio.sleep(3)
         await ctx.channel.delete()
 
+# --- BRISANJE PORUKE PRODAJEM --- 
+# --- FILTER ZA PRODAJU ---
+@bot.event
+async def on_message(message):
+    # Ignorišemo poruke koje šalje sam bot da ne bi ušao u beskonačnu petlju
+    if message.author.bot:
+        return
+
+    # Lista dozvoljenih korisnika (tvoj alias i nemanjaa79)
+    # Proveravamo i username i display_name za svaki slučaj
+    allowed_users = ["knez.exe", "nemanjaa79"]
+    
+    author_name = message.author.name.lower()
+    
+    # Provera reči i korisnika
+    msg_content = message.content.lower()
+    if ("prodaja" in msg_content or "prodajem" in msg_content) and author_name not in allowed_users:
+        try:
+            # Brišemo korisnikovu poruku
+            await message.delete()
+            
+            # ID kanala koji treba tagovati (zameni sa pravim ID-em tvog kanala #🏷️┃prodajem)
+            # Ako ne znaš ID, desni klik na kanal -> Copy ID
+            prodaja_channel_id = 123456789012345678  # <--- OVDE STAVI PRAVI ID KANALA
+            
+            embed = discord.Embed(
+                description=f"{message.author.mention} Pogresan kanal!!! Koristi kanal koji je namenjen za prodaju <#{1479762526819586070}>",
+                color=KING_COLOR
+            )
+            embed.set_footer(text=FOOTER_TEXT)
+            
+            # Šaljemo upozorenje koje se samo obriše posle 10 sekundi da ne pravi spam
+            await message.channel.send(embed=embed, delete_after=10)
+        except Exception as e:
+            print(f"Greška kod brisanja poruke: {e}")
+
+    # OVO JE OBAVEZNO: Omogućava botu da i dalje izvršava ostale komande (&help, &invite...)
+    await bot.process_commands(message)
+
 # --- MODERACIJA ---
 @bot.command()
 @commands.has_permissions(kick_members=True)
