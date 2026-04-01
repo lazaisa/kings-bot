@@ -18,6 +18,10 @@ bot = commands.Bot(command_prefix='&', intents=intents, help_command=None)
 FOOTER_TEXT = "By KnEz.exe | Kings Of Reselling"
 KING_COLOR = 0xffd700
 
+# --- NOVE VARIJABLE ZA RESET ---
+RESETERI = ["knez.exe", "nemanjaa79"]
+invites_reset_timestamp = None
+
 # --- TICKET SISTEM ---
 class TicketView(discord.ui.View):
     def __init__(self):
@@ -56,19 +60,7 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name="Kings Of Reselling 👑"))
     print(f'👑 King {bot.user.name} je online i sve komande su spremne!')
 
-# --- POMOĆNA FUNKCIJA ZA INVITE ---
-async def get_invites_count(member):
-    try:
-        invs = await member.guild.invites()
-        count = 0
-        for i in invs:
-            if i.inviter and i.inviter.id == member.id:
-                count += i.uses
-        return count
-    except:
-        return 0
-
-# -- NAZAD/NAPRED --
+# -- NAZAD/NAPRED (Paginator) --
 class InvitePaginator(discord.ui.View):
     def __init__(self, pages, timeout=60):
         super().__init__(timeout=timeout)
@@ -115,7 +107,6 @@ async def on_message(message):
     author_name = message.author.name.lower()
     msg_content = message.content.lower()
 
-    # --- ANTI-LINK SA AUTOMATSKIM TIMEOUT-OM ---
     if "discord.gg/" in msg_content and author_name not in allowed_users:
         try:
             await message.delete()
@@ -136,18 +127,14 @@ async def on_message(message):
         except Exception as e:
             print(f"Greska kod antilinka: {e}")
 
-     # --- FILTER ZA PRODAJU (SA POPRAVKOM ZA FORUME) ---
     if ("prodaja" in msg_content or "prodajem" in msg_content) and author_name not in allowed_users:
         prodaja_forum_id = 1479762526819586070 
-        
-        # Proveravamo da li je poruka u forumu ili u postu unutar foruma
         is_in_forum = False
         if message.channel.id == prodaja_forum_id:
             is_in_forum = True
         elif hasattr(message.channel, 'parent_id') and message.channel.parent_id == prodaja_forum_id:
             is_in_forum = True
 
-        # Ako NIJE u forumu, tek onda briši
         if not is_in_forum:
             try:
                 await message.delete()
@@ -161,12 +148,10 @@ async def on_message(message):
             except Exception as e:
                 print(f"Greska kod filtera prodaje: {e}")
 
-    # OVO OBAVEZNO OSTAVI NA KRAJU on_message
     await bot.process_commands(message)
 
-
 # =========================================================
-#           KINGS ULTRA AUDIT LOG SISTEM
+#            KINGS ULTRA AUDIT LOG SISTEM
 # =========================================================
 LOG_CHANNEL_ID = 1479757402336268429
 
@@ -371,7 +356,21 @@ async def close(ctx):
         await asyncio.sleep(3)
         await ctx.channel.delete()
 
-# --- INVITE & SOCIAL ---
+# --- NOVA RESET KOMANDA (SAMO ZA KNEZ.EXE) ---
+@bot.command()
+async def rrinvall(ctx):
+    if ctx.author.name.lower() != "knez.exe":
+        return await ctx.send("❌ Samo **knez.exe** može koristiti ovu komandu!")
+    
+    global invites_reset_timestamp
+    invites_reset_timestamp = datetime.datetime.now(datetime.timezone.utc)
+    
+    embed = discord.Embed(title="♻️ RESET STATISTIKE", color=KING_COLOR)
+    embed.description = "Svi invite-ovi su resetovani na **0** za sve članove!\n*(Vlasnici servera su izuzeti)*"
+    embed.set_footer(text=FOOTER_TEXT)
+    await ctx.send(embed=embed)
+
+# --- INVITE & SOCIAL (SA RESET LOGIKOM) ---
 @bot.command()
 async def invite(ctx, member: discord.Member = None):
     target = member if member else ctx.author
@@ -380,11 +379,15 @@ async def invite(ctx, member: discord.Member = None):
         joined = 0
         for i in invs:
             if i.inviter and i.inviter.id == target.id:
-                joined += i.uses
-        left = 0 
-        total = joined - left
+                # Logika za reset: ako je reset aktivan i korisnik nije knez/nemanja
+                if invites_reset_timestamp and target.name.lower() not in RESETERI:
+                    if i.created_at > invites_reset_timestamp:
+                        joined += i.uses
+                else:
+                    joined += i.uses
+                    
         embed = discord.Embed(title="📈 STATISTIKA", color=KING_COLOR)
-        embed.description = f"👤 **Član:** {target.mention}\n━━━━━━━━━━━━━━━━━━\n📥 **Joined:** {joined}\n📤 **Left:** {left}\n🏆 **Total:** {total}\n━━━━━━━━━━━━━━━━━━"
+        embed.description = f"👤 **Član:** {target.mention}\n━━━━━━━━━━━━━━━━━━\n🏆 **Total:** {joined}\n━━━━━━━━━━━━━━━━━━"
         embed.set_footer(text=FOOTER_TEXT)
         await ctx.send(embed=embed)
     except Exception as e:
@@ -397,22 +400,31 @@ async def invitelab(ctx):
         invs = await ctx.guild.invites()
         for i in invs:
             if i.inviter:
-                all_invites[i.inviter] = all_invites.get(i.inviter, 0) + i.uses
+                user = i.inviter
+                uses = i.uses
+                
+                # Provera reseta po korisniku i vremenu kreiranja linka
+                if invites_reset_timestamp and user.name.lower() not in RESETERI:
+                    if i.created_at < invites_reset_timestamp:
+                        uses = 0
+                
+                all_invites[user] = all_invites.get(user, 0) + uses
+        
         sorted_inv = sorted(all_invites.items(), key=lambda x: x[1], reverse=True)[:20]
         if not sorted_inv: return await ctx.send("Nema podataka o invite-ovima.")
+        
         pages = []
         for i in range(0, len(sorted_inv), 10):
             chunk = sorted_inv[i:i + 10]
             embed = discord.Embed(title="🏆 TOP 20 INVITER-A", color=KING_COLOR)
             description = "━━━━━━━━━━━━━━━━━━\n"
-            for index, (user, joined) in enumerate(chunk):
-                left = 0 
-                total = joined - left
-                description += f"**{i + index + 1}. {user.name}**\n📥 Joined: `{joined}` | 📤 Left: `{left}` | 🏆 Total: `{total}`\n\n"
+            for index, (user, total) in enumerate(chunk):
+                description += f"**{i + index + 1}. {user.name}**\n🏆 Total: `{total}`\n\n"
             description += "━━━━━━━━━━━━━━━━━━"
             embed.description = description
             embed.set_footer(text=f"Stranica {len(pages) + 1} | {FOOTER_TEXT}")
             pages.append(embed)
+            
         view = InvitePaginator(pages)
         await ctx.send(embed=pages[0], view=view)
     except Exception as e: await ctx.send(f"Greška: {e}")
@@ -467,7 +479,7 @@ async def say(ctx, *, poruka):
 async def help(ctx):
     embed = discord.Embed(title="📜 KRALJEVSKE KOMANDE", color=KING_COLOR)
     embed.description = "━━━━━━━━━━━━━━━━━━"
-    embed.add_field(name="🛡️ Admin", value="`kick`, `ban`, `unban`, `clear`, `lock`, `unlock`", inline=False)
+    embed.add_field(name="🛡️ Admin", value="`kick`, `ban`, `unban`, `clear`, `lock`, `unlock`, `rrinvall`", inline=False)
     embed.add_field(name="📈 Social", value="`invite`, `invitelab`, `info`, `serverinfo`", inline=False)
     embed.add_field(name="🎉 Ostalo", value="`giveaway`, `ping`, `ticket`", inline=False)
     embed.set_footer(text=FOOTER_TEXT)
